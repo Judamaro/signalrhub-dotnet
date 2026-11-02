@@ -12,7 +12,7 @@ Clean Architecture, with dependencies pointing inwards:
 signalrhub-dotnet
 ├── .vscode/                     Build/test/watch tasks and debug configuration
 ├── SignalRHub.App/              Minimal API endpoints, JWT + API key authentication,
-│                                ProblemDetails, global exception handler, OpenAPI + Swagger UI
+│                                PetitionResponse envelope, global exception handler, OpenAPI + Swagger UI
 ├── SignalRHub.Application/      Use cases (commands/queries), FluentValidation validators,
 │                                delivery strategies, handler decorators,
 │                                ports: IConnectionRegistry, INotificationDispatcher
@@ -42,7 +42,7 @@ Design patterns:
 - **Decorator**: `ValidationCommandHandlerDecorator` and `LoggingCommandHandlerDecorator` wrap every
   command handler (registered with Scrutor).
 - **Lightweight CQRS**: own `ICommandHandler<,>` / `IQueryHandler<,>` interfaces, no MediatR.
-- **Result**: business errors are values (`Result<T>`), mapped to `ProblemDetails` by the API.
+- **Result**: business errors are values (`Result<T>`), mapped to a `PetitionResponse` by the API.
 - **Adapter**: `SignalRNotificationDispatcher` turns the dispatcher port into SignalR calls.
 - Strongly typed hub (`Hub<INotificationClient>`), Options (validated on start), DI extension methods.
 
@@ -100,52 +100,60 @@ Every `/api` endpoint requires the `X-Api-Key` header with one of the keys in `A
 
 ### Response format
 
-Sending a notification returns `200` with the id of the notification and the number of
-connections it was delivered to:
+Every response, successful or not, is a `PetitionResponse`, and its `statusCode` is also the HTTP
+status code of the response:
 
 ```json
 {
-  "notificationId": "01a19d8c-375b-769b-9563-d42430ed3c79",
-  "deliveredConnections": 2,
-  "sentAt": "2026-11-02T18:36:14.5559651+00:00"
+  "success": true,
+  "message": "Notification sent successfully.",
+  "module": "NotificationService",
+  "result": {
+    "notificationId": "01a19daf-5c78-7f95-b34f-9617811e77f0",
+    "deliveredConnections": 2,
+    "sentAt": "2026-11-02T19:14:37.8163599+00:00"
+  },
+  "statusCode": 200
 }
 ```
 
-Listing connections returns `200` with an array (empty when the client has no connections):
+| Property     | Description                                                                                   |
+|--------------|-----------------------------------------------------------------------------------------------|
+| `success`    | Whether the petition was processed successfully                                               |
+| `message`    | Message describing the processing                                                             |
+| `module`     | Module or service that generated the message: `NotificationService`, `ConnectionService`, `TokenService`, `RequestValidation` (malformed or missing body), `GlobalExceptionHandler` (unexpected errors), `HealthCheck` or `Api` (missing API key, unknown route, method or media type) |
+| `result`     | Returned information, or `null` when there is none. On validation failures it holds `errors`, grouped by field |
+| `statusCode` | HTTP status code                                                                              |
 
-```json
-[
-  {
-    "connectionId": "TeRy0U5HZxl8q1K2eLD_3w",
-    "clientId": "client-1",
-    "connectedAt": "2026-11-02T18:36:14.4938723+00:00",
-    "userAgent": "Microsoft SignalR/10.0 (...)"
-  }
-]
-```
+`result` of each endpoint:
 
-Failures are RFC 9457 `ProblemDetails` with a `code` extension and, for validation failures, an
-`errors` dictionary:
+| Endpoint                                   | `result`                                                              |
+|--------------------------------------------|-----------------------------------------------------------------------|
+| `POST /api/notifications/...`              | `{ notificationId, deliveredConnections, sentAt }`                    |
+| `GET /api/clients/{clientId}/connections`  | `[{ connectionId, clientId, connectedAt, userAgent }]` (empty when the client has no connections) |
+| `POST /dev/token`                          | `{ accessToken, expiresAt }`                                          |
+| `GET /health`                              | `{ status, checks }`                                                  |
+
+A validation failure:
 
 ```json
 {
-  "type": "https://httpstatuses.io/404",
-  "title": "Not Found",
-  "status": 404,
-  "detail": "The client 'client-1' has no active connections.",
-  "code": "Client.NoConnections"
+  "success": false,
+  "message": "One or more validation errors occurred.",
+  "module": "NotificationService",
+  "result": { "errors": { "Type": ["'Type' must not be empty."] } },
+  "statusCode": 400
 }
 ```
 
-| Status | Code                                          | When                                              |
-|--------|-----------------------------------------------|---------------------------------------------------|
-| `400`  | `General.Validation`, `ClientId.*`, `ConnectionId.*` | Invalid body or route values               |
-| `401`  |                                               | Missing or invalid API key                        |
-| `404`  | `Client.NoConnections`                        | The client has no active connections              |
-| `404`  | `Connection.NotFound`                         | The connection does not exist                     |
-| `500`  |                                               | Unexpected error                                  |
+Status codes: `200` success, `400` validation (invalid route value, body field, or a malformed or
+missing body), `401` missing or invalid API key, `404` the client has no active connections or the
+connection does not exist, `405`/`415` unsupported method or media type, `500` unexpected error.
 
 ## Sequence diagrams
+
+Every HTTP response is a `PetitionResponse` whose `statusCode` is shown on the arrows back to the
+backend.
 
 ### Connection lifecycle
 
@@ -195,11 +203,11 @@ sequenceDiagram
     API->>API: ClientDeliveryStrategy
     API->>Registry: GetByClientAsync(clientId)
     alt No active connections
-        API-->>Backend: 404 Not Found (Client.NoConnections)
+        API-->>Backend: 404 Not Found
     end
     API->>Hub: Clients(connectionIds).ReceiveNotification
     Hub->>Clients: ReceiveNotification {id, type, payload, createdAt}
-    API-->>Backend: 200 OK (deliveredConnections = N)
+    API-->>Backend: 200 OK (result.deliveredConnections = N)
 ```
 
 ### Send to a connection
@@ -225,11 +233,11 @@ sequenceDiagram
     API->>API: ConnectionDeliveryStrategy
     API->>Registry: GetAsync(connectionId)
     alt Connection not registered
-        API-->>Backend: 404 Not Found (Connection.NotFound)
+        API-->>Backend: 404 Not Found
     end
     API->>Hub: Clients(connectionId).ReceiveNotification
     Hub->>Connection: ReceiveNotification {id, type, payload, createdAt}
-    API-->>Backend: 200 OK (deliveredConnections = 1)
+    API-->>Backend: 200 OK (result.deliveredConnections = 1)
 ```
 
 ### Command pipeline
@@ -262,7 +270,8 @@ sequenceDiagram
 |---------------|----------------------------------------|-----------------------------|
 | `GET /health` | The API is running (no dependencies)   | Docker healthcheck          |
 
-It answers `Healthy` with `200`. The Docker healthcheck calls it with `curl` (installed in the image)
+It answers with a `PetitionResponse` (module `HealthCheck`) whose `result` holds the overall status:
+`200` when healthy, `503` when unhealthy. The Docker healthcheck calls it with `curl` (installed in the image)
 every 30 seconds.
 
 ## Running with Docker

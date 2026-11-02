@@ -1,26 +1,36 @@
 namespace SignalRHub.App.Extensions;
 
+/// <summary>
+/// Translates <see cref="Result"/> values into <see cref="PetitionResponse"/> responses.
+/// </summary>
 internal static class ResultExtensions
 {
-    /// <summary>Maps a failed <see cref="Result"/> to an RFC 9457 problem details response.</summary>
-    public static ProblemHttpResult ToProblem(this Result result)
-    {
-        if (result.IsSuccess)
-            throw new InvalidOperationException("A successful result cannot be converted to a problem.");
+    /// <summary>Creates the response of an operation that returns a value.</summary>
+    public static IResult ToPetitionResponse<TValue>(this Result<TValue> result, string module, string successMessage, int successStatusCode = StatusCodes.Status200OK)
+        => result.IsSuccess ? PetitionResponse.Ok(module, successMessage, result.Value, successStatusCode).ToHttpResult() : result.Error.ToPetitionResponse(module);
 
-        Error error = result.Error;
-        (int status, string title) = error.Type switch
+    /// <summary>Creates the response of a failed operation. Validation errors, grouped by field, are returned as the result.</summary>
+    public static IResult ToPetitionResponse(this Error error, string module)
+    {
+        int statusCode = error.Type switch
         {
-            ErrorType.Validation => (StatusCodes.Status400BadRequest, "Bad Request"),
-            ErrorType.NotFound => (StatusCodes.Status404NotFound, "Not Found"),
-            ErrorType.Conflict => (StatusCodes.Status409Conflict, "Conflict"),
-            _ => (StatusCodes.Status500InternalServerError, "Server Failure"),
+            ErrorType.Validation => StatusCodes.Status400BadRequest,
+            ErrorType.NotFound => StatusCodes.Status404NotFound,
+            ErrorType.Conflict => StatusCodes.Status409Conflict,
+            _ => StatusCodes.Status500InternalServerError,
         };
 
-        Dictionary<string, object?> extensions = new(StringComparer.Ordinal) { ["code"] = error.Code };
-        if (error is ValidationError validation)
-            extensions["errors"] = validation.Errors;
+        Dictionary<string, object?>? details = error is ValidationError validation ? new Dictionary<string, object?>(StringComparer.Ordinal) { ["errors"] = validation.Errors } : null;
 
-        return TypedResults.Problem(title: title, detail: error.Description, statusCode: status, type: $"https://httpstatuses.io/{status}", extensions: extensions);
+        return PetitionResponse.Fail(module, error.Description, statusCode, details).ToHttpResult();
+    }
+
+    /// <summary>Documents that the endpoint answers with a <see cref="PetitionResponse"/> for each status code.</summary>
+    public static RouteHandlerBuilder ProducesPetitionResponse(this RouteHandlerBuilder builder, params int[] statusCodes)
+    {
+        foreach (int statusCode in statusCodes)
+            builder.Produces<PetitionResponse>(statusCode);
+
+        return builder;
     }
 }

@@ -14,14 +14,15 @@ internal sealed class DevTokenEndpoints(IWebHostEnvironment environment) : IEndp
             .WithTags("Development")
             .WithName("IssueDevelopmentToken")
             .WithSummary("Issues a JWT for a client id (Development only).")
+            .ProducesPetitionResponse(StatusCodes.Status200OK, StatusCodes.Status400BadRequest)
             .AllowAnonymous();
     }
 
-    private static Results<Ok<DevTokenResponse>, ProblemHttpResult> IssueToken(DevTokenRequest request, IOptions<JwtOptions> jwtOptions, IOptions<RealtimeOptions> realtimeOptions, TimeProvider timeProvider)
+    private static IResult IssueToken(DevTokenRequest request, IOptions<JwtOptions> jwtOptions, IOptions<RealtimeOptions> realtimeOptions, TimeProvider timeProvider)
     {
         Result<ClientId> clientId = ClientId.Create(request.ClientId);
         if (clientId.IsFailure)
-            return clientId.ToProblem();
+            return clientId.Error.ToPetitionResponse(ResponseModules.TokenService);
 
         JwtOptions jwt = jwtOptions.Value;
         DateTimeOffset now = timeProvider.GetUtcNow();
@@ -39,7 +40,7 @@ internal sealed class DevTokenEndpoints(IWebHostEnvironment environment) : IEndp
             SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256),
         });
 
-        return TypedResults.Ok(new DevTokenResponse(token, expiresAt));
+        return PetitionResponse.Ok(ResponseModules.TokenService, "Token issued successfully.", new DevTokenResponse(token, expiresAt)).ToHttpResult();
     }
 }
 

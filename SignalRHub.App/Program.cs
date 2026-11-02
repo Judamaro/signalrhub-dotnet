@@ -11,6 +11,9 @@ builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddHealthChecks();
 
+// Binding failures (malformed JSON, missing body) throw so GlobalExceptionHandler answers them with a PetitionResponse.
+builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
+
 string[] allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
     .WithOrigins(allowedOrigins)
@@ -21,7 +24,7 @@ builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
 WebApplication app = builder.Build();
 
 app.UseExceptionHandler();
-app.UseStatusCodePages();
+app.UsePetitionResponseStatusCodePages();
 
 if (app.Environment.IsDevelopment())
     app.UseHubOpenApi();
@@ -32,7 +35,7 @@ app.UseAuthorization();
 
 app.MapEndpoints();
 app.MapRealtimeHubs();
-app.MapHealthChecks("/health");
+app.MapHealthEndpoints();
 
 await app.RunAsync().ConfigureAwait(false);
 
