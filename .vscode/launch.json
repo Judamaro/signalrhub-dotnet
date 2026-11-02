@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "SignalRHub.App",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/SignalRHub.App/bin/Debug/net10.0/SignalRHub.App.dll",
+      "cwd": "${workspaceFolder}/SignalRHub.App",
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:5108"
+      },
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)",
+        "uriFormat": "%s/swagger"
+      },
+      "stopAtEntry": false
+    }
+  ]
+}

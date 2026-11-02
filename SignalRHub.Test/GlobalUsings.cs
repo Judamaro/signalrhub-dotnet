@@ -1,0 +1,15 @@
+global using System.Text.Json;
+global using Microsoft.Extensions.Time.Testing;
+global using NSubstitute;
+global using Shouldly;
+global using Xunit;
+global using SignalRHub.Application.Abstractions.Connections;
+global using SignalRHub.Application.Abstractions.Messaging;
+global using SignalRHub.Application.Abstractions.Notifications;
+global using SignalRHub.Application.Behaviors;
+global using SignalRHub.Application.Notifications.Delivery;
+global using SignalRHub.Application.Notifications.Send;
+global using SignalRHub.Domain.Common;
+global using SignalRHub.Domain.Connections;
+global using SignalRHub.Domain.Notifications;
+global using SignalRHub.Infrastructure.Connections;

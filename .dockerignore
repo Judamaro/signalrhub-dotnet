@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/*.user
+.git/
+.gitignore
+SignalRHub.Test/
+.vscode/
+Dockerfile
+docker-compose.yml
+README.md

@@ -1,0 +1,18 @@
+services:
+  signalrhub:
+    build: .
+    image: signalrhub:local
+    ports:
+      - "8080:8080"
+    environment:
+      # Change these values; they are only meant for local runs.
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      Jwt__Issuer: signalrhub
+      Jwt__Audience: signalrhub-clients
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:-local-docker-signing-key-change-me-0123456789}
+      ApiKeys__Keys__0: ${PUBLISHER_API_KEY:-docker-api-key-change-me}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

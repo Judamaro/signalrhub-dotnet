@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="SignalRHub.App/SignalRHub.App.csproj" />
+  <Project Path="SignalRHub.Application/SignalRHub.Application.csproj" />
+  <Project Path="SignalRHub.Domain/SignalRHub.Domain.csproj" />
+  <Project Path="SignalRHub.Infrastructure/SignalRHub.Infrastructure.csproj" />
+  <Project Path="SignalRHub.Test/SignalRHub.Test.csproj" />
+</Solution>
