@@ -1,11 +1,12 @@
 namespace SignalRHub.Test.Application.Notifications;
 
-public sealed class SendNotificationCommandHandlerTests
+public sealed class SendNotificationCommandHandlerTests : IDisposable
 {
     private static readonly string[] ExpectedConnections = ["c1", "c2"];
 
     private readonly IConnectionRegistry _registry = Substitute.For<IConnectionRegistry>();
     private readonly INotificationDispatcher _dispatcher = Substitute.For<INotificationDispatcher>();
+    private readonly TestMeterFactory _meters = new();
     private readonly SendNotificationCommandHandler _handler;
 
     public SendNotificationCommandHandlerTests()
@@ -16,7 +17,7 @@ public sealed class SendNotificationCommandHandlerTests
             new ConnectionDeliveryStrategy(_registry),
         ]);
 
-        _handler = new SendNotificationCommandHandler(resolver, _dispatcher, new FakeTimeProvider(TestData.Now));
+        _handler = new SendNotificationCommandHandler(resolver, _dispatcher, new FakeTimeProvider(TestData.Now), _meters.CreateHubMetrics(_registry));
     }
 
     [Fact]
@@ -25,6 +26,8 @@ public sealed class SendNotificationCommandHandlerTests
         ClientId client = TestData.Client();
         _registry.GetByClientAsync(client, Arg.Any<CancellationToken>())
             .Returns([TestData.ClientConnection("c1"), TestData.ClientConnection("c2")]);
+        using MetricCollector<long> sent = _meters.Collect<long>("signalrhub.notifications.sent");
+        using MetricCollector<long> recipients = _meters.Collect<long>("signalrhub.notifications.recipients");
 
         Result<SendNotificationResponse> result = await _handler.Handle(new SendNotificationCommand(new ClientTarget(client), "order.updated", null), CancellationToken.None);
 
@@ -35,6 +38,9 @@ public sealed class SendNotificationCommandHandlerTests
             Arg.Is<IReadOnlyCollection<ConnectionId>>(ids => ids.Select(i => i.Value).Order().SequenceEqual(ExpectedConnections)),
             Arg.Is<Notification>(n => n.Type == "order.updated"),
             Arg.Any<CancellationToken>());
+        sent.LastMeasurement!.Tags["outcome"].ShouldBe("delivered");
+        sent.LastMeasurement.Tags["target"].ShouldBe("client");
+        recipients.LastMeasurement!.Value.ShouldBe(2);
     }
 
     [Fact]
@@ -42,12 +48,15 @@ public sealed class SendNotificationCommandHandlerTests
     {
         ClientId client = TestData.Client("ghost");
         _registry.GetByClientAsync(client, Arg.Any<CancellationToken>()).Returns([]);
+        using MetricCollector<long> sent = _meters.Collect<long>("signalrhub.notifications.sent");
 
         Result<SendNotificationResponse> result = await _handler.Handle(new SendNotificationCommand(new ClientTarget(client), "ping", null), CancellationToken.None);
 
         result.Error.Type.ShouldBe(ErrorType.NotFound);
         result.Error.Code.ShouldBe("Client.NoConnections");
         await _dispatcher.DidNotReceiveWithAnyArgs().SendAsync(default!, default!, default);
+        sent.LastMeasurement!.Tags["outcome"].ShouldBe("not_found");
+        sent.LastMeasurement.Tags["target"].ShouldBe("client");
     }
 
     [Fact]
@@ -84,6 +93,8 @@ public sealed class SendNotificationCommandHandlerTests
 
         result.Error.Code.ShouldBe("Notification.UnsupportedTarget");
     }
+
+    public void Dispose() => _meters.Dispose();
 
     private sealed record UnknownTarget : NotificationTarget;
 }

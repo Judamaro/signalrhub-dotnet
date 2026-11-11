@@ -10,7 +10,7 @@
       "cwd": "${workspaceFolder}/SignalRHub.App",
       "env": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "ASPNETCORE_URLS": "http://localhost:5108"
+        "ASPNETCORE_URLS": "http://localhost:5108;http://localhost:9465"
       },
       "serverReadyAction": {
         "action": "openExternally",

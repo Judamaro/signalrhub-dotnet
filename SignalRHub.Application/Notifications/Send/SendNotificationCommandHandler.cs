@@ -1,6 +1,6 @@
 namespace SignalRHub.Application.Notifications.Send;
 
-internal sealed class SendNotificationCommandHandler(IDeliveryStrategyResolver strategyResolver, INotificationDispatcher dispatcher, TimeProvider timeProvider) : ICommandHandler<SendNotificationCommand, SendNotificationResponse>
+internal sealed class SendNotificationCommandHandler(IDeliveryStrategyResolver strategyResolver, INotificationDispatcher dispatcher, TimeProvider timeProvider, HubMetrics metrics) : ICommandHandler<SendNotificationCommand, SendNotificationResponse>
 {
     public async Task<Result<SendNotificationResponse>> Handle(SendNotificationCommand command, CancellationToken cancellationToken)
     {
@@ -12,12 +12,18 @@ internal sealed class SendNotificationCommandHandler(IDeliveryStrategyResolver s
         if (strategy.IsFailure)
             return strategy.Error;
 
-
         Result<IReadOnlyCollection<ConnectionId>> recipients = await strategy.Value.ResolveRecipientsAsync(command.Target, cancellationToken).ConfigureAwait(false);
         if (recipients.IsFailure)
-            return recipients.Error;
+        {
+            if (recipients.Error.Type == ErrorType.NotFound)
+                metrics.NotificationNotFound(command.Target);
 
+            return recipients.Error;
+        }
+
+        long dispatchStart = timeProvider.GetTimestamp();
         await dispatcher.SendAsync(recipients.Value, notification.Value, cancellationToken).ConfigureAwait(false);
+        metrics.NotificationDelivered(command.Target, recipients.Value.Count, timeProvider.GetElapsedTime(dispatchStart));
 
         return new SendNotificationResponse(notification.Value.Id, recipients.Value.Count, notification.Value.CreatedAt);
     }

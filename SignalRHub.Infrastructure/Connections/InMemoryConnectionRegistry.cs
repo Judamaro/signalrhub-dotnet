@@ -58,6 +58,14 @@ internal sealed class InMemoryConnectionRegistry : IConnectionRegistry
         }
     }
 
+    public ConnectionRegistryStatistics GetStatistics()
+    {
+        lock (_gate)
+        {
+            return new ConnectionRegistryStatistics(_byClient.Count, _byConnection.Count);
+        }
+    }
+
     private ClientConnection? RemoveCore(ConnectionId connectionId)
     {
         if (!_byConnection.Remove(connectionId, out var removed))

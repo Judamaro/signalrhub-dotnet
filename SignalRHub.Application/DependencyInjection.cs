@@ -8,6 +8,9 @@ public static class DependencyInjection
 
         services.TryAddSingleton(TimeProvider.System);
 
+        services.AddMetrics();
+        services.TryAddSingleton<HubMetrics>();
+
         services.Scan(scan => scan
             .FromAssemblies(assembly)
             .AddClasses(c => c.AssignableTo(typeof(ICommandHandler<,>)), publicOnly: false)

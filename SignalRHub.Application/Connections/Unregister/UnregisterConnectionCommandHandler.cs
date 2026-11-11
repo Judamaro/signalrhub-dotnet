@@ -1,11 +1,16 @@
 namespace SignalRHub.Application.Connections.Unregister;
 
-internal sealed class UnregisterConnectionCommandHandler(IConnectionRegistry registry) : ICommandHandler<UnregisterConnectionCommand, ClientConnectionResponse>
+internal sealed class UnregisterConnectionCommandHandler(IConnectionRegistry registry, HubMetrics metrics) : ICommandHandler<UnregisterConnectionCommand, ClientConnectionResponse>
 {
     public async Task<Result<ClientConnectionResponse>> Handle(UnregisterConnectionCommand command, CancellationToken cancellationToken)
     {
         var removed = await registry.RemoveAsync(command.ConnectionId, cancellationToken).ConfigureAwait(false);
 
-        return removed is null ? ConnectionErrors.ConnectionNotFound(command.ConnectionId) : ClientConnectionResponse.From(removed);
+        if (removed is null)
+            return ConnectionErrors.ConnectionNotFound(command.ConnectionId);
+
+        metrics.ConnectionClosed();
+
+        return ClientConnectionResponse.From(removed);
     }
 }

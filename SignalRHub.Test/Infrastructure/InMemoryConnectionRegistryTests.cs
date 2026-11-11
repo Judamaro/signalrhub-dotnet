@@ -47,6 +47,20 @@ public sealed class InMemoryConnectionRegistryTests
     }
 
     [Fact]
+    public async Task GetStatistics_counts_clients_and_connections()
+    {
+        await _registry.AddAsync(Connection("c1", "client-a"));
+        await _registry.AddAsync(Connection("c2", "client-a"));
+        await _registry.AddAsync(Connection("c3", "client-b"));
+        _registry.GetStatistics().ShouldBe(new ConnectionRegistryStatistics(Clients: 2, Connections: 3));
+
+        await _registry.RemoveAsync(Id("c3"));
+        await _registry.AddAsync(Connection("c1", "client-c"));
+
+        _registry.GetStatistics().ShouldBe(new ConnectionRegistryStatistics(Clients: 2, Connections: 2));
+    }
+
+    [Fact]
     public async Task Handles_concurrent_adds_and_removes()
     {
         string[] ids = Enumerable.Range(0, 1_000).Select(i => $"c{i}").ToArray();

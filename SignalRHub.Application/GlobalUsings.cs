@@ -1,4 +1,5 @@
 global using System.Diagnostics;
+global using System.Diagnostics.Metrics;
 global using System.Reflection;
 global using System.Text.Json;
 global using Microsoft.Extensions.DependencyInjection;
@@ -10,6 +11,7 @@ global using SignalRHub.Application.Abstractions.Connections;
 global using SignalRHub.Application.Abstractions.Messaging;
 global using SignalRHub.Application.Abstractions.Notifications;
 global using SignalRHub.Application.Behaviors;
+global using SignalRHub.Application.Common;
 global using SignalRHub.Application.Notifications.Delivery;
 global using SignalRHub.Domain.Common;
 global using SignalRHub.Domain.Connections;

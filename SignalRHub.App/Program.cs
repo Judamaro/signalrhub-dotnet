@@ -5,6 +5,7 @@ builder.Services
     .AddInfrastructure(builder.Configuration)
     .AddHubAuthentication(builder.Configuration)
     .AddHubOpenApi()
+    .AddHubMetrics(builder.Configuration)
     .AddEndpoints(typeof(Program).Assembly);
 
 builder.Services.AddProblemDetails();
@@ -25,6 +26,7 @@ WebApplication app = builder.Build();
 
 app.UseExceptionHandler();
 app.UsePetitionResponseStatusCodePages();
+app.UseHubMetrics();
 
 if (app.Environment.IsDevelopment())
     app.UseHubOpenApi();

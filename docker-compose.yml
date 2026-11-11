@@ -4,6 +4,9 @@ services:
     image: signalrhub:local
     ports:
       - "8080:8080"
+    # Metrics port: reachable by Prometheus inside the Docker network, not published on the host.
+    expose:
+      - "9464"
     environment:
       # Change these values; they are only meant for local runs.
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}

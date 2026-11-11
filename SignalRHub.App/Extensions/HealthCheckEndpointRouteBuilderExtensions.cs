@@ -9,12 +9,12 @@ internal static class HealthCheckEndpointRouteBuilderExtensions
     public const string LivenessPath = "/health";
 
     /// <summary>
-    /// Maps <c>/health</c> (liveness: the API is running). Healthy and degraded reports answer <c>200</c>,
+    /// Maps <c>/health</c> (liveness: the API is running), excluded from the HTTP server metrics. Healthy and degraded reports answer <c>200</c>,
     /// unhealthy reports answer <c>503</c>.
     /// </summary>
     public static IEndpointRouteBuilder MapHealthEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapHealthChecks(LivenessPath, new HealthCheckOptions { ResponseWriter = WritePetitionResponseAsync });
+        endpoints.MapHealthChecks(LivenessPath, new HealthCheckOptions { ResponseWriter = WritePetitionResponseAsync }).DisableHttpMetrics();
 
         return endpoints;
     }

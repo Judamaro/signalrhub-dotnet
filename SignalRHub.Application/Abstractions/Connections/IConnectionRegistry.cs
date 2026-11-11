@@ -14,4 +14,10 @@ public interface IConnectionRegistry
     Task<ClientConnection?> GetAsync(ConnectionId connectionId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyCollection<ClientConnection>> GetByClientAsync(ClientId clientId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns how many clients and connections are registered. It is synchronous and must be cheap,
+    /// because metrics read it on every scrape.
+    /// </summary>
+    ConnectionRegistryStatistics GetStatistics();
 }
